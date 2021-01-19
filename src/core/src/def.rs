@@ -2,7 +2,7 @@ use std::sync::{Arc, Weak};
 use parking_lot::{RwLock, Mutex};
 use std::collections::{HashMap, HashSet};
 use core_def::{CliId, CliIdRef, EnvId, VmId, VmKind, Ipv4, VmPort, PubPort};
-use std::path::{PathBuf, Path};
+use std::{fs, path::{PathBuf, Path}};
 use serde::{Deserialize, Serialize};
 use lazy_static::lazy_static;
 use myutil::{err::*, *};
@@ -84,6 +84,16 @@ impl CfgDB {
             path: p.to_path_buf(),
         }
     }
+    /// write config to disk
+    pub fn write(&self, cli_id: &CliIdRef, env: &Env) -> Result<()> {
+        serde_json::to_string_pretty(env).c(d!()).and_then(|cfg| {
+            let mut cfgpath = self.path.clone();
+            cfgpath.push(base64::encode(cli_id));
+            fs::create_dir_all(&cfgpath).c(d!())?;
+            cfgpath.push(format!("{}.json", env.id));
+            fs::write(cfgpath, cfg).c(d!())
+        })
+    }
 }
 
 #[derive(Debug, Default)]
@@ -147,6 +157,21 @@ impl Serv {
     #[inline(always)]
     pub fn del_client(&self, id: &CliIdRef) {
         self.cli.write().remove(id);
+    }
+    /// if env is null , create it
+    pub fn register_env(&self, id: CliId, mut env: Env) -> Result<()> {
+        let cli_id = id.clone();
+        let mut cli = self.cli.write();
+        let env_set = cli.entry(id).or_insert(map!());
+        if env_set.get(&env.id).is_some() {
+            Err(eg!("env already exists!"))
+        } else {
+            env.vm.values_mut().for_each(|vm| vm.image_cached = true);
+            self.cfg_db.write(&cli_id, &env).c(d!()).map(|_| {
+                env.cli_belong_to = Some(cli_id);
+                env_set.insert(env.id.clone(), env);
+            })
+        }
     }
 }
 
