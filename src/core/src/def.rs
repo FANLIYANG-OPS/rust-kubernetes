@@ -1,12 +1,15 @@
-use std::sync::{Arc, Weak};
-use parking_lot::{RwLock, Mutex};
-use std::collections::{HashMap, HashSet};
-use core_def::{CliId, CliIdRef, EnvId, VmId, VmKind, Ipv4, VmPort, PubPort};
-use std::{fs, path::{PathBuf, Path}};
-use serde::{Deserialize, Serialize};
+use crate::{pause, resume, vm};
+use core_def::{CliId, CliIdRef, EnvId, EnvIdRef, Ipv4, PubPort, VmId, VmKind, VmPort};
 use lazy_static::lazy_static;
 use myutil::{err::*, *};
-use crate::vm;
+use parking_lot::{Mutex, RwLock};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Weak};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 const MAX_LIFE_TIME: u64 = 6 * 3600;
 const MIN_START_STOP_ITV: u64 = 20;
@@ -31,6 +34,12 @@ pub struct Vm {
     pub during_stop: bool,
     pub image_cached: bool,
     pub rand_uuid: bool,
+}
+
+impl Vm {
+    pub fn get_id(&self) -> VmId {
+        self.id
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize, Debug)]
@@ -69,7 +78,6 @@ impl Resource {
     }
 }
 
-
 #[derive(Debug, Default)]
 pub struct CfgDB {
     path: PathBuf,
@@ -107,6 +115,34 @@ pub struct Serv {
 }
 
 impl Serv {
+    /// start env
+    pub fn start_env(&self, cli_id: &CliIdRef, env_id: &EnvIdRef) -> Result<()> {
+        if let Some(env_set) = self.cli.write().get_mut(env_id) {
+            if let Some(env) = env_set.get_mut(env_id) {
+                let timestamp = ts!();
+                if env.last_mgmt_ts + MIN_START_STOP_ITV > timestamp {
+                    Err(eg!(format!(
+                        "wait {} seconds , and try again!",
+                        MIN_START_STOP_ITV
+                    )))
+                }
+                env.last_mgmt_ts = timestamp;
+                env.vm.values_mut().for_each(|vm| {
+                    resume(vm).c(d!()).map(|_| {
+                        let mut rsc = self.resource.write();
+                        rsc.vm_active += 1;
+                        rsc.cpu_used += vm.cpu_num;
+                        rsc.memory_used += vm.memory_size;
+                        rsc.disk_used += vm.disk_size;
+                        vm.during_stop = false;
+                    })?;
+                });
+                env.is_stopped = false;
+            }
+        }
+        Ok(())
+    }
+
     #[inline(always)]
     pub fn new(cfg_path: &str) -> Serv {
         let mut s = Serv::default();
@@ -126,11 +162,15 @@ impl Serv {
     pub fn clean_expired_env(&self) {
         let ts = ts!();
         let cli = self.cli.read();
-        let expired = cli.iter().map(|(cli_id, env)| {
-            env.iter().filter(|(_, v)| v.end_timestamp < ts)
-                .map(move |(k, _)| (cli_id.clone(), k.clone()))
-        })
-            .flatten().collect::<Vec<_>>();
+        let expired = cli
+            .iter()
+            .map(|(cli_id, env)| {
+                env.iter()
+                    .filter(|(_, v)| v.end_timestamp < ts)
+                    .map(move |(k, _)| (cli_id.clone(), k.clone()))
+            })
+            .flatten()
+            .collect::<Vec<_>>();
         if !expired.is_empty() {
             drop(cli);
             let mut cli = self.cli.write();
@@ -173,6 +213,40 @@ impl Serv {
             })
         }
     }
+
+    /// delete env
+    pub fn del_env(&self, cli_id: &CliIdRef, env_id: &EnvIdRef) {
+        if let Some(env_set) = self.cli.write().get_mut(cli_id) {
+            if let Some(mut env) = env_set.remove(env_id) {
+                env.vm.values_mut().for_each(|v| v.image_cached = false);
+            }
+        }
+    }
+
+    pub fn stop_env(&self, cli_id: &CliIdRef, env_id: &EnvIdRef) -> Result<()> {
+        if let Some(env_set) = self.cli.write().get_mut(cli_id) {
+            if let Some(env) = env_set.get_mut(env_id) {
+                let timestamp = ts!();
+                if env.last_mgmt_ts + MIN_START_STOP_ITV > timestamp {
+                    Err(eg!(format!(
+                        "wait {} seconds , and try again !",
+                        MIN_START_STOP_ITV
+                    )))
+                }
+                env.last_mgmt_ts = ts;
+                env.vm.values_mut().for_each(|vm| {
+                    pause(vm.get_id()).c(d!()).map(|_| {
+                        let mut rsc = self.resource.write();
+                        rsc.vm_active -= 1;
+                        rsc.cpu_used -= vm.cpu_num;
+                        rsc.memory_used -= vm.memory_used;
+                        rsc.disk_used -= vm.disk_size;
+                        vm.during_stop = true;
+                    })?;
+                });
+                env.is_stopped = true;
+            }
+        }
+        Ok(())
+    }
 }
-
-
