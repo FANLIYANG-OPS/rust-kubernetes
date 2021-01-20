@@ -1,7 +1,5 @@
-use crate::{pause, resume, vm};
-use core_def::{
-    CliId, CliIdRef, EnvId, EnvIdRef, EnvInfo, EnvMeta, Ipv4, PubPort, VmId, VmInfo, VmKind, VmPort,
-};
+use crate::{pause, resume, vm, nat};
+use core_def::{CliId, CliIdRef, EnvId, EnvIdRef, EnvInfo, EnvMeta, Ipv4, PubPort, VmId, VmInfo, VmKind, VmPort, SSH_PORT, EXEC_PORT};
 use lazy_static::lazy_static;
 use myutil::{err::*, *};
 use parking_lot::{Mutex, RwLock};
@@ -10,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Weak};
 use std::{
     fs,
+    sync::atomic::{AtomicI32, AtomicU16, Ordering},
     path::{Path, PathBuf},
 };
 
@@ -39,10 +38,39 @@ pub struct Vm {
 }
 
 impl Vm {
+    fn alloc_pub_port(
+        &mut self,
+        server: &Arc<Serv>,
+    ) -> Result<()> {
+        const PUB_PORT_LIMIT: u16 = 20000;
+        const PUB_PORT_BASE: u16 = 40000;
+        lazy_static! {
+            static ref PUB_PORT: AtomicU16 = AtomicU16::new(PUB_PORT_BASE);
+        }
+        let mut center = 0;
+        let mut center_length = self.port_map.len();
+        let mut buf = vct![];
+        while 0 < center_length {
+            let mut port_inuse = server.pub_port_inuse.lock();
+            let port = PUB_PORT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |x| {
+                Some(PUB_PORT_BASE + (1 + x) % PUB_PORT_LIMIT)
+            }).map_err(|_| eg!(d!(FUCK))).c(d!())?;
+            if port_inuse.get(&port).is_none() {
+                port_inuse.insert(port);
+                buf.push(port);
+                center_length -= 1;
+            }
+            center += 1;
+            if PUB_PORT_LIMIT < center {
+                Err(eg!(FUCK))
+            }
+        };
+        self.port_map.values_mut().zip(buf.into_iter()).for_each(|(p, port)| { *p = port });
+        Ok(())
+    }
     pub fn get_id(&self) -> VmId {
         self.id
     }
-
     pub(crate) fn as_info(&self) -> VmInfo {
         VmInfo {
             os: self
@@ -98,12 +126,12 @@ impl Env {
 
             if cpu_new > cpu
                 && res
-                    .cpu_used
-                    .checked_add(cpu_new)
-                    .map(|i| i.checked_sub(cpu))
-                    .flatten()
-                    .ok_or(eg!(FUCK))?
-                    > res.cpu_total
+                .cpu_used
+                .checked_add(cpu_new)
+                .map(|i| i.checked_sub(cpu))
+                .flatten()
+                .ok_or(eg!(FUCK))?
+                > res.cpu_total
             {
                 Err(eg!(format!(
                     "cpu resource busy: total {}MB , used {}MB , need {}MB",
@@ -113,12 +141,12 @@ impl Env {
 
             if memory_new > memory
                 && res
-                    .memory_used
-                    .checked_add(memory_new)
-                    .map(|i| i.checked_sub(memory))
-                    .flatten()
-                    .ok_or(eg!(FUCK))?
-                    > res.memory_total
+                .memory_used
+                .checked_add(memory_new)
+                .map(|i| i.checked_sub(memory))
+                .flatten()
+                .ok_or(eg!(FUCK))?
+                > res.memory_total
             {
                 Err(eg!(format!(
                     "memory resource busy: total {}MB , used {}MB, need {}MB",
@@ -128,12 +156,12 @@ impl Env {
 
             if disk_new > disk
                 && res
-                    .disk_used
-                    .checked_add(disk_new)
-                    .map(|i| i.checked_sub(disk))
-                    .flatten()
-                    .ok_or(eg!(FUCK))?
-                    > res.disk_total
+                .disk_used
+                .checked_add(disk_new)
+                .map(|i| i.checked_sub(disk))
+                .flatten()
+                .ok_or(eg!(FUCK))?
+                > res.disk_total
             {
                 Err(eg!(format!(
                     "disk resource busy: total {}MB , used {}MB , need {}MB ",
@@ -171,10 +199,8 @@ impl Env {
             } else {
                 Ok(())
             };
-
             self.check_resource_and_set((cpu_new, memory_new, disk_new))
                 .c(d!())?;
-
             self.vm.values_mut().for_each(|vm| {
                 vm.cpu_num = cpu_new;
                 vm.memory_size = memory_new;
@@ -184,17 +210,39 @@ impl Env {
         if !vm_port.is_empty() {
             let mut port_vec = vm_port.to_vec();
             if let Some(server) = self.serv_belong_to.upgrade() {
-                let mut lock = server.pub_port_inuse.lock();
-                let vm_set = self.vm.values().fold(vct![], |mut base, vm| {
-                    vm.port_map.values().for_each(|port| {
-                        lock.remove(port);
-                        base.push(vm);
+                {
+                    let mut lock = server.pub_port_inuse.lock();
+                    let vm_set = self.vm.values().fold(vct![], |mut base, vm| {
+                        vm.port_map.values().for_each(|port| {
+                            lock.remove(port);
+                            base.push(vm);
+                        });
+                        base
                     });
-                    base
+                    nat::clean_rule(vm_set.as_slice()).c(d!())
+                }
+                port_vec.push(SSH_PORT);
+                port_vec.push(EXEC_PORT);
+                port_vec.sort_unstable();
+                port_vec.dedup();
+                self.vm.values_mut().for_each(|vm| {
+                    vm.port_map = port_vec.iter().map(|p| (*p, 0u16)).collect();
+                    vm.alloc_pub_port(&server).c(d!()).and_then(|_| nat::set_rule(vm).c(d!()))?;
                 });
+            } else {
+                Err(eg!(FUCK))
+            }
+            if let Some(going) = out_going {
+                let vm_set = self.vm.values().collect::<Vec<_>>();
+                if going && !self.outgoing_denied {
+                    nat::deny_outgoing(vm_set.as_slice()).c(d!())?;
+                    self.outgoing_denied = true;
+                } else if !going && self.outgoing_denied {
+                    nat::allow_outgoing(vm_set.as_slice()).c(d!())?;
+                    self.outgoing_denied = false;
+                }
             }
         }
-
         Ok(())
     }
 
@@ -290,26 +338,26 @@ pub struct Serv {
 
 impl Serv {
     /// update env cpu/memory/disk...
-    // pub fn update_env_hardware(
-    //     &self,
-    //     cli_id: &CliIdRef,
-    //     env_id: &EnvIdRef,
-    //     cpu_memory_disk: (Option<i32>, Option<i32>, Option<i32>),
-    //     vm_port: &[port],
-    //     out_going: Option<bool>,
-    // ) -> Option<()> {
-    //     let mut cli = self.cli.write();
-    //     if let Some(env_set) = cli.get_mut(cli_id) {
-    //         if let Some(env) = env_set.get_mut(env_id) {
-    //             let (cpu, memory, disk) = cpu_memory_disk;
-    //             Ok(())
-    //         } else {
-    //             Err(eg!("env not exists"))
-    //         }
-    //     } else {
-    //         Err(eg!("cli not exists"))
-    //     }
-    // }
+    pub fn update_env_hardware(
+        &self,
+        cli_id: &CliIdRef,
+        env_id: &EnvIdRef,
+        cpu_memory_disk: (Option<i32>, Option<i32>, Option<i32>),
+        vm_port: &[port],
+        out_going: Option<bool>,
+    ) -> Result<()> {
+        let mut cli = self.cli.write();
+        if let Some(env_set) = cli.get_mut(cli_id) {
+            if let Some(env) = env_set.get_mut(env_id) {
+                let (cpu, memory, disk) = cpu_memory_disk;
+                env.update_hardware(cpu, memory, disk, vm_port, out_going).c(d!())
+            } else {
+                Err(eg!("env not exists"))
+            }
+        } else {
+            Err(eg!("cli not exists"))
+        }
+    }
 
     /// patch delete vm
     pub fn update_env_del_vm(
