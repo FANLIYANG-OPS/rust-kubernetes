@@ -8,7 +8,6 @@ pub(crate) fn clean_rule(_vm_set: &[&Vm]) -> Result<()> {
 pub(crate) fn set_rule(_vm: &Vm) -> Result<()> {
     Ok(())
 }
-
 pub(crate) fn deny_outgoing(_vm_set: &[&Vm]) -> Result<()> {
     Ok(())
 }

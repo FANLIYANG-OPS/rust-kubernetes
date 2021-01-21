@@ -17,15 +17,3 @@ pub(crate) fn get_pre_starter(_vm: &Vm) -> Result<fn(&Vm) -> Result<()>> {
 fn pre_start(_vm: &Vm) -> Result<()> {
     Ok(())
 }
-
-
-
-
-
-
-
-
-
-
-
-
