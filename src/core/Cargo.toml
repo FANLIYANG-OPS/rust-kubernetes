@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 core_def = { path = "../core_def" }
-nix = "0.19"
+nix = "0.19.1"
 libc = "0.2"
 lazy_static = "1.4"
 parking_lot = "0.11"

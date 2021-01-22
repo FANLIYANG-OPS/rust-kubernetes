@@ -596,14 +596,6 @@ pub struct CfgDB {
 }
 
 impl CfgDB {
-    // todo
-    // pub fn read_all() -> Result<HashMap<CliId, Vec<Env>>> {
-    //     let get_cli_list = || -> Result<Vec<(CliId, PathBuf)>> {
-    //         let mut cli_list = vec![];
-    //
-    //     };
-    // }
-
     pub fn del(&self, env: &Env) -> Result<()> {
         let mut cfg_path = self.path.clone();
         let client = env
