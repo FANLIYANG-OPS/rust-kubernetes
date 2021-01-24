@@ -1,0 +1,10 @@
+/home/fly/rust-projects/kubernetes_open/target/debug/deps/crc32fast-395bf06bb0c05b95.rmeta: /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/lib.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/baseline.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/combine.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/specialized/mod.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/table.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/specialized/pclmulqdq.rs
+
+/home/fly/rust-projects/kubernetes_open/target/debug/deps/crc32fast-395bf06bb0c05b95.d: /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/lib.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/baseline.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/combine.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/specialized/mod.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/table.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/specialized/pclmulqdq.rs
+
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/lib.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/baseline.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/combine.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/specialized/mod.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/table.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/crc32fast-1.2.1/src/specialized/pclmulqdq.rs:

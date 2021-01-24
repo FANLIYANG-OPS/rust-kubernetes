@@ -1,0 +1,9 @@
+/home/fly/rust-projects/kubernetes_open/target/debug/deps/futures_executor-d4b621bdeb0689bc.rmeta: /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/lib.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/local_pool.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/unpark_mutex.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/thread_pool.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/enter.rs
+
+/home/fly/rust-projects/kubernetes_open/target/debug/deps/futures_executor-d4b621bdeb0689bc.d: /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/lib.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/local_pool.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/unpark_mutex.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/thread_pool.rs /home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/enter.rs
+
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/lib.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/local_pool.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/unpark_mutex.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/thread_pool.rs:
+/home/fly/.cargo/registry/src/mirrors.ustc.edu.cn-61ef6e0cd06fb9b8/futures-executor-0.3.12/src/enter.rs:
