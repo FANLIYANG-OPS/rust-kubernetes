@@ -67,6 +67,8 @@ impl fmt::Display for Ipv4 {
 }
 
 /// current support container type
+
+#[derive(Debug,Clone)]
 pub enum VmKind {
     Qemu,
     Bhyve,
@@ -129,7 +131,7 @@ pub struct EnvMeta {
     /// env stop time
     pub end_timestamp: u64,
     /// inside container
-    pub vm_cnt: uszie,
+    pub vm_cnt: usize,
     /// is stop
     pub is_stopped: bool,
 }
