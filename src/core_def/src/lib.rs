@@ -68,7 +68,7 @@ impl fmt::Display for Ipv4 {
 
 /// current support container type
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum VmKind {
     Qemu,
     Bhyve,
@@ -164,12 +164,3 @@ pub struct VmCfgProxy {
     pub disk_size: Option<i32>,
     pub rand_uuid: bool,
 }
-
-
-
-
-
-
-
-
-

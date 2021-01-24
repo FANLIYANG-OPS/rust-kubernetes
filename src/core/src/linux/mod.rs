@@ -2,6 +2,8 @@ use crate::img_root_register;
 use myutil::{err::*, *};
 use nix::sched::{clone, CloneFlags};
 pub(crate) mod vm;
+pub(crate) mod nat;
+
 
 #[cfg(feature = "zfs")]
 pub fn exec(img_path: &str, func: fn() -> Result<()>, server_ip: &str) -> Result<()> {
@@ -26,8 +28,11 @@ fn do_exec(func: fn() -> Result<()>, server_ip: &str) {
             vm::util::mount_make_private()
                 .c(d!())
                 // todo
-                .and_then(|_| vm::util::mount_tmp_fs().c(d!()))
-                .and_then(|_| vm::util::mount_tmp_fs().c(d!())) // todo
+                .and_then(|_| vm::util::mount_dyn_fs_proc().c(d!()))
+                .and_then(|_| vm::util::mount_tmp_fs().c(d!())) 
+                .and_then(|_| vm::engine::init().c(d!()))
+                .and_then(|_| vm::cgroup::init().c(d!()))
+                // todo
         )
     };
 }

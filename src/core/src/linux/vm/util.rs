@@ -1,6 +1,25 @@
 use myutil::{err::*, *};
 use nix::mount::{self, MsFlags};
 
+
+
+#[cfg(not(feature = "testmock"))]
+pub(in crate::linux) fn mount_cgroup2(path: &str) -> Result<()> {
+    mount_fs(None, Some(path), Some("cgroup2"), MsFlags::empty(), None).c(d!())
+}
+
+/// mount proc dir
+pub(in crate::linux) fn mount_dyn_fs_proc() -> Result<()> {
+    let mut flags = MsFlags::empty();
+    flags.insert(MsFlags::MS_NODEV);
+    flags.insert(MsFlags::MS_NOEXEC);
+    flags.insert(MsFlags::MS_NOSUID);
+    flags.insert(MsFlags::MS_RELATIME);
+
+    mount_fs(None, Some("/proc"), Some("proc"), flags, None).c(d!())
+}
+
+/// mount tmp dir
 pub(in crate::linux) fn mount_tmp_fs() -> Result<()> {
     let mut flags = MsFlags::empty();
     flags.insert(MsFlags::MS_RELATIME);
@@ -29,5 +48,5 @@ fn mount_fs(
     flags: MsFlags,
     data: Option<&str>,
 ) -> Result<()> {
-    mount::mount(from, to.unwrap(), fs_type, flags, data);
+    mount::mount(from, to.unwrap(), fs_type, flags, data).c(d!())
 }

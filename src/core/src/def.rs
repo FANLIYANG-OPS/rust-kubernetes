@@ -4,7 +4,6 @@ use core_def::{
     CliId, CliIdRef, EnvId, EnvIdRef, EnvInfo, EnvMeta, Ipv4, PubPort, VmCfg, VmId, VmInfo, VmKind,
     VmPort, CPU_DEFAULT, DISK_DEFAULT, EXEC_PORT, MEMORY_DEFAULT, SSH_PORT,
 };
-use futures::StreamExt;
 use lazy_static::lazy_static;
 use myutil::{err::*, *};
 use parking_lot::{Mutex, RwLock};
