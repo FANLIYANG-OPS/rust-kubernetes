@@ -1,29 +1,4 @@
-// pub(in crate::linux) fn init(serv_ip: &str) -> Result<()> {
-//     set_rule_cron();
-
-//     let arg = format!("
-//         add table {proto} {table};
-//         delete table {proto} {table};
-//         add table {proto} {table};
-//         add set {proto} {table} BLACK_LIST {{ type ipv4_addr; }};
-//         add chain {proto} {table} FWD_CHAIN {{ type filter hook forward priority 0; policy accept; }};
-//         add rule {proto} {table} FWD_CHAIN ct state established,related accept;
-//         add rule {proto} {table} FWD_CHAIN {proto} saddr @BLACK_LIST drop;
-//         add map {proto} {table} PORT_TO_PORT {{ type inet_service: inet_service; }};
-//         add map {proto} {table} PORT_TO_IPV4 {{ type inet_service: ipv4_addr; }};
-//         add chain {proto} {table} DNAT_CHAIN {{ type nat hook prerouting priority -100; }};
-//         add chain {proto} {table} SNAT_CHAIN {{ type nat hook postrouting priority 100; }};
-//         add rule {proto} {table} DNAT_CHAIN dnat tcp dport map @PORT_TO_IPV4: tcp dport map @PORT_TO_PORT;
-//         add rule {proto} {table} DNAT_CHAIN dnat udp dport map @PORT_TO_IPV4: udp dport map @PORT_TO_PORT;
-//         add rule {proto} {table} SNAT_CHAIN ip saddr 10.0.0.0/8 ip daddr != 10.0.0.0/8 snat to {pubip};
-//         ",
-//         proto=TABLE_PROTO,
-//         table=TABLE_NAME,
-//         pubip=serv_ip,
-//     );
-
-//     nft_exec(&arg).c(d!())
-// }
+pub(crate) use real::*;
 
 #[cfg(feature = "nft")]
 pub(crate) mod real {
@@ -42,43 +17,26 @@ pub(crate) mod real {
         static ref RUST_SET_ALLOW_FAIL: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vct![]));
     }
 
-    // pub(in crate::linux) fn init(serv_ip: &str) -> Result<()> {
-    //     set_rule_cron();
-
-    //     let arg = format!("
-
-    //         add chain {proto} {table} FWD_CHAIN {{ type filter hook forward priority 0; policy accept; }};
-    //         add rule {proto} {table} FWD_CHAIN ct state established,related accept;
-    //         add rule {proto} {table} FWD_CHAIN {proto} saddr @BLACK_LIST drop;
-
-    //         add map {proto} {table} PORT_TO_PORT {{ type inet_service: inet_service; }};
-    //         add map {proto} {table} PORT_TO_IPV4 {{ type inet_service: ipv4_addr; }};
-    //         add chain {proto} {table} DNAT_CHAIN {{ type nat hook prerouting priority -100; }};
-    //         add chain {proto} {table} SNAT_CHAIN {{ type nat hook postrouting priority 100; }};
-    //         add rule {proto} {table} DNAT_CHAIN dnat tcp dport map @PORT_TO_IPV4: tcp dport map @PORT_TO_PORT;
-    //         add rule {proto} {table} DNAT_CHAIN dnat udp dport map @PORT_TO_IPV4: udp dport map @PORT_TO_PORT;
-    //         add rule {proto} {table} SNAT_CHAIN ip saddr 10.0.0.0/8 ip daddr != 10.0.0.0/8 snat to {pubip};
-    //         ",
-    //         proto=TABLE_PROTO,
-    //         table=TABLE_NAME,
-    //         pubip=serv_ip,
-    //     );
-
-    //     nft_exec(&arg).c(d!())
-    // }
-
     pub(in crate::linux) fn init(server_ip: &str) -> Result<()> {
         set_rule_cron();
-        let args = format!(
-            "
+        let args = format!("
             add table {proto} {table};
             delete table {proto} {table};
             add table {proto} {table};
             add set {proto} {table} BLACK_LIST {{type ipv4_addr;}};
             add chain {proto} {table} FWD_CHAIN {{type filter hook forward priority 0; policy accept;}};
-        ",
+            add rule {proto} {table} FWD_CHAIN ct state established,related accept;
+            add rule {proto} {table} FWD_CHAIN {proto} saddr @BLACK_LIST drop;
+            add map {proto} {table} PORT_TO_PORT {{type inet_service: inet_service;}};
+            add map {proto} {table} PORT_TO_IPV4 {{ type inet_service: ipv4_addr;}};
+            add chain {proto} {table} DNAT_CHAIN {{type nat hook prerouting priority -100;}};
+            add chain {proto} {table} SNAT_CHAIN {{ type nat hook postrouting priority 100 ;}};
+            add rule {proto} {table} DNAT_CHAIN dnat tcp dport map @PORT_TO_IPV4: tcp dport map @PORT_TO_PORT;
+            add rule {proto} {table} DNAT_CHAIN dnat udp dport map @PORT_TO_TPV4: udp dport map @PORT_TO_PORT;
+            add rule {proto} {table} SNAT_CHAIN ip saddr 10.0.0.0/8 ip daddr != 10.0.0.0/8 snat to {pubip};",
             proto = TABLE_PROTO,
-            table = TABLE_NAME
+            table = TABLE_NAME,
+            pubip=server_ip
         );
         nft_exec(&args).c(d!())
     }

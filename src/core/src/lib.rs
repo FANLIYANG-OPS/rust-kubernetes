@@ -11,9 +11,10 @@ mod linux;
 pub use linux::*;
 
 mod common {
+
     use crate::Vm;
     use std::path::PathBuf;
-    pub(crate) const CLONE_MARK: &str = "_clone";
+    pub(crate) const CLONE_MARK: &str = "clone_";
     use futures::executor::{ThreadPool, ThreadPoolBuilder};
     use lazy_static::lazy_static;
     use myutil::{err::*, *};
