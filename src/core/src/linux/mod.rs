@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{img_root_register, ImageTag, OsName, CLONE_MARK};
+use crate::{img_root_register, ImageTag, OsName, Vm, CLONE_MARK};
 use core_def::VmKind;
 use myutil::{err::*, *};
 use nix::sched::{clone, CloneFlags};
@@ -100,6 +100,12 @@ pub fn get_os_info(image_path: &str) -> Result<HashMap<OsName, ImageTag>> {
 #[ignore = "always"]
 pub fn pause() -> Result<()> {
     // todo
-    vm::cgroup::init();
-    Ok(())
+    vm::cgroup::init().c(d!())
+}
+
+
+
+#[inline(always)]
+pub fn resume(vm: &Vm) -> Result<()> {
+    vm::start(vm).c(d!())
 }

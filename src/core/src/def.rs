@@ -1,4 +1,3 @@
-use crate::vm_img_path;
 use crate::{nat, pause, resume, vm};
 use core_def::{
     CliId, CliIdRef, EnvId, EnvIdRef, EnvInfo, EnvMeta, Ipv4, PubPort, VmCfg, VmId, VmInfo, VmKind,
@@ -21,7 +20,7 @@ use std::{thread, time};
 const MAX_LIFE_TIME: u64 = 6 * 3600;
 const MIN_START_STOP_ITV: u64 = 20;
 const VM_PRESET_ID: i32 = -1;
-const FUCK: &str = "THE FUCKING WORLD IS OVER !!!";
+pub const FUCK: &str = "THE FUCKING WORLD IS OVER !!!";
 const VM_ID_LIMIT: i32 = 0xffff;
 pub type OsName = String;
 pub type ImageTag = String;
