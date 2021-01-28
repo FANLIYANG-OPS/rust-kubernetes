@@ -17,6 +17,8 @@ pub(crate) mod real {
         static ref RUST_SET_ALLOW_FAIL: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vct![]));
     }
 
+    
+
     pub(in crate::linux) fn init(server_ip: &str) -> Result<()> {
         set_rule_cron();
         let args = format!("

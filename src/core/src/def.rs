@@ -1,7 +1,10 @@
-use crate::{nat, pause, resume, vm};
+use crate::{
+    common,
+    mocker::{nat, pause, resume, vm},
+};
 use core_def::{
-    CliId, CliIdRef, EnvId, EnvIdRef, EnvInfo, EnvMeta, Ipv4, PubPort, VmCfg, VmId, VmInfo, VmKind,
-    VmPort, CPU_DEFAULT, DISK_DEFAULT, EXEC_PORT, MEMORY_DEFAULT, SSH_PORT,
+    CliId, CliIdRef, EnvId, EnvIdRef, EnvInfo, EnvMeta, Ipv4, Port, PubPort, VmCfg, VmId, VmInfo,
+    VmKind, VmPort, CPU_DEFAULT, DISK_DEFAULT, EXEC_PORT, MEMORY_DEFAULT, SSH_PORT,
 };
 use lazy_static::lazy_static;
 use myutil::{err::*, *};
@@ -16,7 +19,6 @@ use std::{
 };
 #[cfg(not(feature = "testmock"))]
 use std::{thread, time};
-
 const MAX_LIFE_TIME: u64 = 6 * 3600;
 const MIN_START_STOP_ITV: u64 = 20;
 const VM_PRESET_ID: i32 = -1;
@@ -99,14 +101,14 @@ impl Vm {
                 }
                 cnter += 1;
                 if VM_ID_LIMIT < cnter {
-                    Err(eg!(FUCK))
+                    return Err(eg!(FUCK));
                 }
             }
         } else if vm_id_inuse.get(&self.id).is_none() {
             vm_id_inuse.insert(self.id);
             self.id
         } else {
-            Err(eg!(FUCK))
+            return Err(eg!(FUCK));
         };
         Ok(vm_id)
     }
@@ -189,7 +191,7 @@ impl Vm {
             }
             center += 1;
             if PUB_PORT_LIMIT < center {
-                Err(eg!(FUCK))
+                return Err(eg!(FUCK));
             }
         }
         self.port_map
@@ -258,20 +260,22 @@ impl Env {
         let mut vm: Vec<Vm> = vec![];
         self.check_resource(&cfg_set).c(d!())?;
         if preload {
-            vm_set
-                .into_iter()
-                .for_each(|v| vm.push(Vm::create_mate_from_cache(&self.serv_belong_to, v)?));
+            vm_set.into_iter().for_each(|v| {
+                vm.push(Vm::create_mate_from_cache(&self.serv_belong_to, v).unwrap())
+            });
         } else {
             cfg_set
                 .into_iter()
-                .for_each(|cfg| vm.push(Vm::create_mate(&self.serv_belong_to, cfg)?));
+                .for_each(|cfg| vm.push(Vm::create_mate(&self.serv_belong_to, cfg).unwrap()));
         }
 
         Self::check_image(&vm).c(d!());
         vm.into_iter()
             .filter(|v| !v.during_stop)
-            .for_each(|v| v.start_vm().c(d!())?);
-        vm.into_iter().for_each(|v| self.vm.insert(v.get_id(), v)?);
+            .for_each(|v| v.start_vm().c(d!()).unwrap());
+        vm.into_iter().for_each(|v| {
+            self.vm.insert(v.get_id(), v);
+        });
         if self.outgoing_denied {
             self.update_hardware(None, None, None, &[], Some(true))
                 .c(d!())?
@@ -281,7 +285,7 @@ impl Env {
 
     fn check_image(vm: &[Vm]) -> Result<()> {
         let mut cnter = 0;
-        let path_set: Vec<_> = vm.iter().map(|v| vm_img_path(v)).collect();
+        let path_set: Vec<_> = vm.iter().map(|v| common::vm_img_path(v)).collect();
         let mut time_out = (path_set.len() * 100) as u64;
         alt!(2000 > time_out, time_out = 2000);
         let time_out_unit = 200;
@@ -292,9 +296,9 @@ impl Env {
             .any(|p| p.is_err())
         {
             if limit < cnter {
-                Err(
+                return Err(
                     eg!(@path_set.into_iter().filter( |p| p.canonicalize().is_err()).collect::<Vec<_>>()),
-                )
+                );
             }
             cnter += 1;
             thread::sleep(time::Duration::from_millis(time_out_unit));
@@ -329,29 +333,29 @@ impl Env {
             let (cpu, memory, disk) = if let (Some(c), Some(m), Some(d)) = (cpu, memory, disk) {
                 (c, m, d)
             } else {
-                Err(eg!(FUCK))
+                return Err(eg!(FUCK));
             };
 
             if res.cpu_used.checked_add(cpu).ok_or(eg!(FUCK))? > res.cpu_total {
-                Err(eg!(format!(
+                return Err(eg!(format!(
                     "cpu resource busy: total {}, used {} , need {}",
                     res.cpu_total, res.cpu_used, cpu
-                )))
+                )));
             }
             if res.memory_used.checked_add(memory).ok_or(eg!(FUCK))? > res.memory_total {
-                Err(eg!(format!(
+                return Err(eg!(format!(
                     "memory resource busy: total {}, used {} , need {}",
                     res.memory_total, res.memory_used, memory
-                )))
+                )));
             }
             if res.disk_used.checked_add(disk).ok_or(eg!(FUCK))? > res.disk_total {
-                Err(eg!(format!(
+                return Err(eg!(format!(
                     "disk resource busy: total {}, used {} , need {}",
                     res.disk_total, res.disk_used, disk
-                )))
+                )));
             }
         } else {
-            Err(eg!(FUCK))
+            return Err(eg!(FUCK));
         }
         Ok(())
     }
@@ -363,7 +367,7 @@ impl Env {
             inuse.insert(env_id.to_owned());
             drop(inuse);
         } else {
-            Err(eg!(FUCK))
+            return Err(eg!(FUCK));
         }
         Ok(Env {
             id: env_id.to_owned(),
@@ -406,7 +410,7 @@ impl Env {
             ) {
                 (CPU, MEMORY, DISK)
             } else {
-                Err(eg!(FUCK))
+                return Err(eg!(FUCK));
             };
 
             if cpu_new > cpu
@@ -418,10 +422,10 @@ impl Env {
                     .ok_or(eg!(FUCK))?
                     > res.cpu_total
             {
-                Err(eg!(format!(
+                return Err(eg!(format!(
                     "cpu resource busy: total {}MB , used {}MB , need {}MB",
                     res.cpu_total, res.cpu_used, cpu_new,
-                )))
+                )));
             }
 
             if memory_new > memory
@@ -433,10 +437,10 @@ impl Env {
                     .ok_or(eg!(FUCK))?
                     > res.memory_total
             {
-                Err(eg!(format!(
+                return Err(eg!(format!(
                     "memory resource busy: total {}MB , used {}MB, need {}MB",
                     res.memory_total, res.memory_used, memory_new
-                )))
+                )));
             }
 
             if disk_new > disk
@@ -448,17 +452,17 @@ impl Env {
                     .ok_or(eg!(FUCK))?
                     > res.disk_total
             {
-                Err(eg!(format!(
+                return Err(eg!(format!(
                     "disk resource busy: total {}MB , used {}MB , need {}MB ",
                     res.disk_total, res.disk_used, disk_new
-                )))
+                )));
             }
             let mut result = server.resource.write();
             result.cpu_used = result.cpu_used + (cpu_new / vm_num) - (cpu / vm_num);
             result.memory_used = result.memory_used + (memory_new / vm_num) - (memory / vm_num);
             result.disk_used = result.disk_used + (disk_new / vm_num) - (disk / vm_num);
         } else {
-            Err(eg!(FUCK))
+            return Err(eg!(FUCK));
         }
         Ok(())
     }
@@ -469,12 +473,12 @@ impl Env {
         cpu: Option<i32>,
         memory: Option<i32>,
         disk: Option<i32>,
-        vm_port: &[VmPort],
+        vm_port: &[Port],
         out_going: Option<bool>,
     ) -> Result<()> {
         if [&cpu, &memory, &disk].iter().any(|i| i.is_some()) {
             if !self.is_stopped {
-                Err(eg!("env must be stopped before update it's hardware[s]."))
+                return Err(eg!("env must be stopped before update it's hardware[s]."));
             }
             let (cpu_new, memory_new, disk_new) = if let Some(vm) = self.vm.values().next() {
                 (
@@ -483,7 +487,7 @@ impl Env {
                     disk.unwrap_or(vm.disk_size),
                 )
             } else {
-                Ok(())
+                return Ok(());
             };
             self.check_resource_and_set((cpu_new, memory_new, disk_new))
                 .c(d!())?;
@@ -505,7 +509,7 @@ impl Env {
                         });
                         base
                     });
-                    nat::clean_rule(vm_set.as_slice()).c(d!())
+                    nat::clean_rule(vm_set.as_slice()).c(d!()).unwrap();
                 }
                 port_vec.push(SSH_PORT);
                 port_vec.push(EXEC_PORT);
@@ -515,10 +519,11 @@ impl Env {
                     vm.port_map = port_vec.iter().map(|p| (*p, 0u16)).collect();
                     vm.alloc_pub_port(&server)
                         .c(d!())
-                        .and_then(|_| nat::set_rule(vm).c(d!()))?;
+                        .and_then(|_| nat::set_rule(vm).c(d!()))
+                        .unwrap();
                 });
             } else {
-                Err(eg!(FUCK))
+                return Err(eg!(FUCK));
             }
             if let Some(going) = out_going {
                 let vm_set = self.vm.values().collect::<Vec<_>>();
@@ -537,17 +542,17 @@ impl Env {
     /// update env lift time
     pub fn update_life(&mut self, s: u64, is_fucker: bool) -> Result<()> {
         if MAX_LIFE_TIME < s && !is_fucker {
-            Err(eg!("life time so long!!!"))
-        } else {
-            self.end_timestamp = self.start_timestamp + s;
+            return Err(eg!("life time so long!!!"));
         }
+        self.end_timestamp = self.start_timestamp + s;
+        Ok(())
     }
 
     /// convert env meta message
     fn as_meta(&self) -> EnvMeta {
         EnvMeta {
             id: self.id.clone(),
-            start_timestamp: self.start_timetamp,
+            start_timestamp: self.start_timestamp,
             end_timestamp: self.end_timestamp,
             vm_cnt: self.vm.len(),
             is_stopped: self.is_stopped,
@@ -645,7 +650,7 @@ impl Serv {
         cli_id: &CliIdRef,
         env_id: &EnvIdRef,
         cpu_memory_disk: (Option<i32>, Option<i32>, Option<i32>),
-        vm_port: &[port],
+        vm_port: &[Port],
         out_going: Option<bool>,
     ) -> Result<()> {
         let mut cli = self.cli.write();
@@ -710,7 +715,7 @@ impl Serv {
     pub fn get_env_details(&self, cli_id: &CliIdRef, env_set: Vec<EnvId>) -> Vec<EnvInfo> {
         let get_env_details = |env: &HashMap<EnvId, Env>| {
             env.values()
-                .filter(|&v| env_set.iter().any(|vid| vid == v.id))
+                .filter(|&v| env_set.iter().any(|vid| vid == &v.id))
                 .map(|env| env.as_info())
                 .collect::<Vec<_>>()
         };
@@ -747,21 +752,24 @@ impl Serv {
             if let Some(env) = env_set.get_mut(env_id) {
                 let timestamp = ts!();
                 if env.last_mgmt_ts + MIN_START_STOP_ITV > timestamp {
-                    Err(eg!(format!(
+                    return Err(eg!(format!(
                         "wait {} seconds , and try again!",
                         MIN_START_STOP_ITV
-                    )))
+                    )));
                 }
                 env.last_mgmt_ts = timestamp;
                 env.vm.values_mut().for_each(|vm| {
-                    resume(vm).c(d!()).map(|_| {
-                        let mut rsc = self.resource.write();
-                        rsc.vm_active += 1;
-                        rsc.cpu_used += vm.cpu_num;
-                        rsc.memory_used += vm.memory_size;
-                        rsc.disk_used += vm.disk_size;
-                        vm.during_stop = false;
-                    })?;
+                    resume(vm)
+                        .c(d!())
+                        .map(|_| {
+                            let mut rsc = self.resource.write();
+                            rsc.vm_active += 1;
+                            rsc.cpu_used += vm.cpu_num;
+                            rsc.memory_used += vm.memory_size;
+                            rsc.disk_used += vm.disk_size;
+                            vm.during_stop = false;
+                        })
+                        .unwrap();
                 });
                 env.is_stopped = false;
             }
@@ -854,21 +862,24 @@ impl Serv {
             if let Some(env) = env_set.get_mut(env_id) {
                 let timestamp = ts!();
                 if env.last_mgmt_ts + MIN_START_STOP_ITV > timestamp {
-                    Err(eg!(format!(
+                    return Err(eg!(format!(
                         "wait {} seconds , and try again !",
                         MIN_START_STOP_ITV
-                    )))
+                    )));
                 }
-                env.last_mgmt_ts = ts;
+                env.last_mgmt_ts = ts!();
                 env.vm.values_mut().for_each(|vm| {
-                    pause(vm.get_id()).c(d!()).map(|_| {
-                        let mut rsc = self.resource.write();
-                        rsc.vm_active -= 1;
-                        rsc.cpu_used -= vm.cpu_num;
-                        rsc.memory_used -= vm.memory_used;
-                        rsc.disk_used -= vm.disk_size;
-                        vm.during_stop = true;
-                    })?;
+                    pause(vm.get_id())
+                        .c(d!())
+                        .map(|_| {
+                            let mut rsc = self.resource.write();
+                            rsc.vm_active -= 1;
+                            rsc.cpu_used -= vm.cpu_num;
+                            rsc.memory_used -= vm.memory_size;
+                            rsc.disk_used -= vm.disk_size;
+                            vm.during_stop = true;
+                        })
+                        .unwrap();
                 });
                 env.is_stopped = true;
             }
