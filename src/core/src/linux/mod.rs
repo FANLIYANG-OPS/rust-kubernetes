@@ -103,8 +103,6 @@ pub fn pause() -> Result<()> {
     vm::cgroup::init().c(d!())
 }
 
-
-
 #[inline(always)]
 pub fn resume(vm: &Vm) -> Result<()> {
     vm::start(vm).c(d!())
