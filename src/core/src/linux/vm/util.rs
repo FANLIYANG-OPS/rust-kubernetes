@@ -1,7 +1,9 @@
 use myutil::{err::*, *};
-use nix::mount::{self, MsFlags};
-
-
+use nix::{
+    mount::{self, MsFlags},
+    sys::wait,
+    unistd,
+};
 
 #[cfg(not(feature = "testmock"))]
 pub(in crate::linux) fn mount_cgroup2(path: &str) -> Result<()> {
@@ -49,4 +51,12 @@ fn mount_fs(
     data: Option<&str>,
 ) -> Result<()> {
     mount::mount(from, to.unwrap(), fs_type, flags, data).c(d!())
+}
+
+pub(in crate::linux) fn wait_pid() -> () {
+    while let Ok(st) = wait::waitpid(unistd::Pid::from_raw(-1), Some(wait::WaitPidFlag::WNOHANG)) {
+        if st == wait::WaitStatus::StillAlive {
+            break;
+        }
+    }
 }

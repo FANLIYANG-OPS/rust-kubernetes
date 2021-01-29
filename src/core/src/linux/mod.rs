@@ -1,13 +1,13 @@
+#[cfg(feature = "zfs")]
+use crate::{img_root_register, ImageTag, OsName, Vm, CLONE_MARK};
+use core_def::VmKind;
+use myutil::{err::*, *};
+use nix::sched::{clone, CloneFlags};
 use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
-
-use crate::{img_root_register, ImageTag, OsName, Vm, CLONE_MARK};
-use core_def::VmKind;
-use myutil::{err::*, *};
-use nix::sched::{clone, CloneFlags};
 pub(crate) mod nat;
 pub(crate) mod vm;
 
@@ -99,11 +99,26 @@ pub fn get_os_info(image_path: &str) -> Result<HashMap<OsName, ImageTag>> {
 
 #[ignore = "always"]
 pub fn pause() -> Result<()> {
-    // todo
     vm::cgroup::init().c(d!())
 }
 
 #[inline(always)]
 pub fn resume(vm: &Vm) -> Result<()> {
     vm::start(vm).c(d!())
+}
+
+fn gen_walk(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut res: Vec<PathBuf> = vct![];
+    if dir.is_dir() {
+        for entry in fs::read_dir(dir).c(d!()).unwrap() {
+            let entry = entry.c(d!()).unwrap();
+            let path = entry.path();
+            if path.is_dir() {
+                res.append(&mut gen_walk(&path).c(d!()).unwrap());
+            } else if let Some(p) = path.to_str() {
+                res.push(PathBuf::from(p));
+            }
+        }
+    }
+    Ok(res)
 }

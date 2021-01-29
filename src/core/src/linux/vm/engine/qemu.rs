@@ -1,10 +1,10 @@
+use crate::{async_sleep, common::CLONE_MARK, vm, THREAD_POOL, ZFS_ROOT};
+use crate::{common::vm_img_path, linux, Vm};
 use lazy_static::lazy_static;
 use linux::vm::cmd_exec;
 use myutil::{err::*, *};
 use nix::{sys::wait, unistd};
 use std::fs;
-
-use crate::{common::vm_img_path, linux, Vm};
 #[cfg(feature = "nft")]
 pub(super) const BRIDGE: &str = "ttcore-bridge";
 
@@ -23,6 +23,22 @@ lazy_static! {
                 }
             }))
     };
+}
+
+#[cfg(feature = "zfs")]
+#[inline(always)]
+pub(super) fn remove_image(vm: &Vm) -> Result<()> {
+    let args = format!(
+        "zfs destory {root}/{clone_mark}/{id}",
+        root = *ZFS_ROOT,
+        clone_mark = CLONE_MARK,
+        id = vm.id
+    );
+    THREAD_POOL.spawn_ok(async move {
+        async_sleep(5).await;
+        info_omit!(cmd_exec("sh", &["-c", &args]));
+    });
+    Ok(())
 }
 
 #[cfg(feature = "zfs")]
@@ -139,3 +155,50 @@ pub(super) fn init() -> Result<()> {
             })
         })
 }
+
+#[inline(always)]
+pub(crate) fn pre_start(vm: &Vm) -> Result<()> {
+    if !vm.image_cached {
+        create_image(vm).c(d!())?;
+    }
+    #[cfg(feature = "nft")]
+    create_tap(&format!("TAP-{}", vm.id)).c(d!()).unwrap();
+    Ok(())
+}
+
+#[cfg(feature = "zfs")]
+pub(crate) fn create_image(vm: &Vm) -> Result<()> {
+    let args = format!(
+        "zfs clone -o volmode=dev {root}/{os}@base {root}/{clone_mark}{id}",
+        root = *ZFS_ROOT,
+        os = vm
+            .image_path
+            .file_name()
+            .ok_or(eg!())
+            .unwrap()
+            .to_str()
+            .ok_or(eg!())
+            .unwrap(),
+        clone_mark = CLONE_MARK,
+        id = vm.id,
+    );
+    cmd_exec("sh", &["-c", &args]).c(d!())
+}
+
+#[cfg(feature = "nft")]
+#[inline(always)]
+fn create_tap(tap: &str) -> Result<()> {
+    cmd_exec("ip", &["tuntap", "add", &tap, "mode", "tap"]).c(d!())
+}
+
+#[cfg(feature = "nft")]
+#[inline(always)]
+pub(super) fn remove_tap(vm: &Vm) -> Result<()> {
+    let tap = format!("TAP-{}", vm.id);
+    THREAD_POOL.spawn_ok(async move {
+        async_sleep(5).await;
+        info_omit!(cmd_exec("ip", &["tuntap", "del", &tap, "mode", "tap"]).c(d!()))
+    });
+    Ok(())
+}
+

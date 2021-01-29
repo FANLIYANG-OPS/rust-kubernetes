@@ -1,12 +1,67 @@
-use crate::linux::vm::util;
 use crate::FUCK;
-use core_def::{Pid, VmId};
+use crate::{common, linux::vm::util};
+use common::{async_sleep, THREAD_POOL};
+use core_def::VmId;
 use myutil::{err::*, *};
-use std::{fs, io::Write, path::PathBuf};
+use nix::{
+    sys::signal::{self, kill},
+    unistd::Pid,
+};
+use std::{fs, io::Write, path::PathBuf, process};
 
 const CGROUP_ROOT_PATH: &str = "/tmp/.ttcgroup";
 const CGROUP_ADMIN_PATH: &str = "/tmp/.ttcgroup/ttadmin";
 const CGROUP_PROCS: &str = "cgroup.procs";
+
+fn cgroup_reset_admin() -> Result<()> {
+    let group_procs_info: String = format!("{}/{}", CGROUP_ADMIN_PATH, CGROUP_PROCS);
+    fs::OpenOptions::new()
+        .append(true)
+        .open(group_procs_info.as_str())
+        .c(d!())
+        .unwrap()
+        .write(process::id().to_string().as_bytes())
+        .c(d!())
+        .map(|_| ())
+}
+
+pub(crate) fn kill_vm(id: VmId) -> Result<()> {
+    get_proc_meta_path(id)
+        .c(d!())
+        .and_then(|p| kill_group(p).c(d!()))
+}
+
+fn kill_group(cgroup_path: PathBuf) -> Result<()> {
+    fs::read(&cgroup_path)
+        .c(d!())
+        .and_then(|b| String::from_utf8(b).c(d!()))
+        .and_then(|s| {
+            let mut failed_list = vct![];
+            s.lines().for_each(|pid| {
+                let pid = pnk!(pid.parse::<u32>());
+                if process::id() == pid {
+                    info_omit!(cgroup_reset_admin());
+                    return;
+                }
+                kill(Pid::from_raw(pid as libc::pid_t), signal::SIGTERM)
+                    .c(d!())
+                    .unwrap_or_else(|e| failed_list.push((pid, e)))
+            });
+            alt!(
+                failed_list.is_empty(),
+                Ok(()),
+                Err(eg!(format!("{:#?}", failed_list)))
+            )
+        })
+        .and_then(|_| cgroup_path.parent().ok_or(eg!(FUCK)))
+        .map(|dir| {
+            let dir = dir.to_owned();
+            THREAD_POOL.spawn_ok(async move {
+                async_sleep(5).await;
+                info_omit!(fs::remove_dir(&dir))
+            })
+        })
+}
 
 pub(in crate::linux) fn init() -> Result<()> {
     fs::create_dir_all(CGROUP_ROOT_PATH)

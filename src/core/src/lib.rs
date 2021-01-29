@@ -3,13 +3,15 @@
 
 mod def;
 pub use def::*;
-
+// #[cfg(feature = "testmock")]
 mod mocker;
+// #[cfg(feature = "testmock")]
 pub use mocker::*;
-
+#[cfg(not(feature = "testmock"))]
 mod linux;
+#[cfg(not(feature = "testmock"))]
 pub use linux::*;
-
+#[cfg(not(feature = "testmock"))]
 mod common {
 
     use crate::Vm;
@@ -51,7 +53,6 @@ mod common {
         vm_img_path
     }
 }
-
+#[cfg(not(feature = "testmock"))]
 pub(crate) use common::*;
-
 mod test;
