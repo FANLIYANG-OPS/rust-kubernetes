@@ -7,17 +7,52 @@ pub(crate) mod real {
     use lazy_static::lazy_static;
     use myutil::{err::*, *};
     use parking_lot::Mutex;
-    use std::{mem, process, sync::Arc};
+    use std::{collections::HashSet, mem, process, sync::Arc};
 
     const TABLE_PROTO: &str = "ip";
     const TABLE_NAME: &str = "tt-core";
 
     lazy_static! {
         static ref RULE_SET: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vct![]));
-        static ref RUST_SET_ALLOW_FAIL: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vct![]));
+        static ref RULE_SET_ALLOW_FAIL: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vct![]));
     }
 
-    
+    #[inline(always)]
+    pub(crate) fn allow_outgoing(vm_set: &[&Vm]) -> Result<()> {
+        let ip_set = vm_set
+            .iter()
+            .map(|vm| vm.ip.to_string())
+            .collect::<Vec<_>>();
+        if ip_set.is_empty() {
+            return Ok(());
+        }
+        let args = format!(
+            " delete element {proto} {table} BLACK_LIST {{{ip_set}}}; ",
+            proto = TABLE_PROTO,
+            table = TABLE_NAME,
+            ip_set = ip_set.join(","),
+        );
+        RULE_SET_ALLOW_FAIL.lock().push(args);
+        Ok(())
+    }
+
+    pub(crate) fn deny_outgoing(vm_set: &[&Vm]) -> Result<()> {
+        let ip_set = vm_set
+            .iter()
+            .map(|vm| vm.ip.to_string())
+            .collect::<Vec<_>>();
+        if ip_set.is_empty() {
+            return Ok(());
+        }
+        let args = format!(
+            "add element {proto} {table} BLACK_LIST {{ {ip_set} }}",
+            proto = TABLE_PROTO,
+            table = TABLE_NAME,
+            ip_set = ip_set.join(","),
+        );
+        RULE_SET.lock().push(args);
+        Ok(())
+    }
 
     pub(in crate::linux) fn init(server_ip: &str) -> Result<()> {
         set_rule_cron();
@@ -43,6 +78,61 @@ pub(crate) mod real {
         nft_exec(&args).c(d!())
     }
 
+    pub(crate) fn set_rule(vm: &Vm) -> Result<()> {
+        if vm.port_map.is_empty() {
+            return Ok(());
+        }
+
+        let mut port_to_ipv4: Vec<String> = vct![];
+        let mut port_to_port: Vec<String> = vct![];
+
+        vm.port_map.iter().for_each(|(vm_port, pub_port)| {
+            port_to_ipv4.push(format!("{}:{}", pub_port, vm.ip.as_str()));
+            port_to_port.push(format!("{}:{}", pub_port, vm_port));
+        });
+
+        let args = format!(
+            "
+            add element {proto} {table} PORT_TO_IPV4 {{ {ptoip} }};
+            add element {proto} {table} PORT_TO_PORT {{ {ptop} }};
+        ",
+            proto = TABLE_PROTO,
+            table = TABLE_NAME,
+            ptoip = port_to_ipv4.join(","),
+            ptop = port_to_port.join(","),
+        );
+
+        RULE_SET.lock().push(args);
+        Ok(())
+    }
+
+    pub(crate) fn clean_rule(vm_set: &[&Vm]) -> Result<()> {
+        let port_set = vm_set
+            .iter()
+            .map(|vm| vm.port_map.values())
+            .flatten()
+            .collect::<HashSet<_>>();
+        if port_set.is_empty() {
+            return Ok(());
+        }
+        let args = format!(
+            "
+            delete element {proto} {table} PORT_TO_IPV4 {{{pub_port}}};
+            delete element {proto} {table} PORT_TO_PORT {{{pub_port}}};
+            ",
+            proto = TABLE_PROTO,
+            table = TABLE_NAME,
+            pub_port = port_set
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+        RULE_SET.lock().push(args);
+        omit!(allow_outgoing(vm_set));
+        Ok(())
+    }
+
     fn set_rule_cron() {
         THREAD_POOL.spawn_ok(async {
             loop {
@@ -54,7 +144,7 @@ pub(crate) mod real {
                         info_omit!(nft_exec(dbg!(&args.join(""))));
                     })
                 }
-                let args_allow_fail = mem::take(&mut *RUST_SET_ALLOW_FAIL.lock());
+                let args_allow_fail = mem::take(&mut *RULE_SET_ALLOW_FAIL.lock());
                 if !args_allow_fail.is_empty() {
                     THREAD_POOL.spawn_ok(async move {
                         async_sleep(1).await;

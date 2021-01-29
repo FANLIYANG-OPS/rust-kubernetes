@@ -156,6 +156,7 @@ pub struct VmCfg {
     pub rand_uuid: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct VmCfgProxy {
     pub image_tag: String,
     pub port_list: Vec<VmPort>,

@@ -4,8 +4,6 @@ pub(crate) mod util;
 
 use std::{os::unix::prelude::CommandExt, process};
 
-use cgroup::kill_vm;
-use engine::remove_image;
 use myutil::{err::*, *};
 use nix::unistd::{fork, ForkResult};
 

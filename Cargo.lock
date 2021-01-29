@@ -523,6 +523,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "server_def"
+version = "0.1.0"
+dependencies = [
+ "core_def",
+ "myutil",
+ "serde",
+]
+
+[[package]]
 name = "sha1"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

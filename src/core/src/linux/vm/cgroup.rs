@@ -1,6 +1,7 @@
 use crate::FUCK;
 use crate::{common, linux::vm::util};
 use common::{async_sleep, THREAD_POOL};
+use core_def::Pid as core_def_pid;
 use core_def::VmId;
 use myutil::{err::*, *};
 use nix::{
@@ -80,11 +81,11 @@ fn get_mnt_point(id: VmId) -> Result<PathBuf> {
     }
 }
 
-pub(in crate::linux) fn add_vm(id: VmId, pid: Pid) -> Result<()> {
+pub(in crate::linux) fn add_vm(id: VmId, pid: core_def_pid) -> Result<()> {
     add_proc(id, pid).c(d!())
 }
 
-fn add_proc(id: VmId, pid: Pid) -> Result<()> {
+fn add_proc(id: VmId, pid: core_def_pid) -> Result<()> {
     get_proc_meta_path(id)
         .c(d!())
         .and_then(|meta| fs::OpenOptions::new().append(true).open(meta).c(d!()))
